@@ -1,68 +1,68 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
+from .player_manager import PlayerManager
 
-# 전역 관리 (임시 메모리 – 실제로는 redis나 DB로 이전 가능)
-connected_users = {}  # channel_name -> user info
-available_colors = [
-    "#FF5733", "#33FF57", "#3357FF", "#F39C12",
-    "#9B59B6", "#1ABC9C", "#E74C3C", "#2ECC71"
-]
+player_manager = PlayerManager()
 
 class GameConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        if not available_colors:
-            await self.close()  # 색상 다 떨어졌으면 접속 불가
-            return
+        self.player_id = player_manager.add_player()
+        self.room_group_name = "game_room"
 
-        # 유저 고유 색상 및 초기 좌표 부여
-        color = available_colors.pop(0)
-        connected_users[self.channel_name] = {
-            'color': color,
-            'x': 0,
-            'y': 0,
-        }
-
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
         await self.accept()
 
-        # 전체 사용자 목록 브로드캐스트
-        await self.broadcast_users()
+        # 초기 상태 전송
+        await self.send(text_data=json.dumps({
+            "type": "init",
+            "id": self.player_id,
+            "players": player_manager.get_players()
+        }))
 
-    async def disconnect(self, close_code):
-        user = connected_users.pop(self.channel_name, None)
-        if user:
-            available_colors.append(user['color'])  # 색상 반환
-
-        await self.broadcast_users()
+        # 브로드캐스트 전체 상태
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "broadcast_state"
+            }
+        )
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        if data['type'] == 'move':
-            dx, dy = data['dx'], data['dy']
-            if self.channel_name in connected_users:
-                connected_users[self.channel_name]['x'] += dx
-                connected_users[self.channel_name]['y'] += dy
+        if data.get("type") == "move":
+            dx = data.get("dx", 0)
+            dy = data.get("dy", 0)
+            player_manager.move_player(self.player_id, dx, dy)
 
-        await self.broadcast_users()
+            # 전체 상태 브로드캐스트
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "broadcast_state"
+                }
+            )
 
-    async def broadcast_users(self):
-        users = [
+    async def disconnect(self, close_code):
+        player_manager.remove_player(self.player_id)
+
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        # 브로드캐스트 전체 상태
+        await self.channel_layer.group_send(
+            self.room_group_name,
             {
-                'id': ch,
-                'color': info['color'],
-                'x': info['x'],
-                'y': info['y']
+                "type": "broadcast_state"
             }
-            for ch, info in connected_users.items()
-        ]
-        message = {
-            'type': 'users_update',
-            'users': users
-        }
-        for ch in connected_users.keys():
-            await self.channel_layer.send(ch, {
-                'type': 'send_update',
-                'message': message
-            })
+        )
 
-    async def send_update(self, event):
-        await self.send(text_data=json.dumps(event['message']))
+    async def broadcast_state(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "update",
+            "players": player_manager.get_players()
+        }))
