@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Game</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+    }
+    canvas {
+      flex: 1;
+      background: #f0f0f0;
+    }
+    #chat {
+      width: 20%;
+      background: #ffffff;
+      border-left: 1px solid #ccc;
+      display: flex;
+      flex-direction: column;
+    }
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    #chat input {
+      padding: 10px;
+      border: none;
+      border-top: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="chat">
+    <div id="messages"></div>
+    <input type="text" id="chatInput" placeholder="Type a message..." />
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const socket = new WebSocket("ws://" + window.location.host + "/ws/game/");
+
+    let users = [];
+    let myId = null;
+
+    socket.onmessage = function(event) {
+      const data = JSON.parse(event.data);
+      if (data.type === "users_update") {
+        users = data.users;
+        drawUsers();
+      }
+    };
+
+    function drawUsers() {
+      // 내 유저 찾기
+      const me = users.find(u => u.id === myId);
+      if (!me) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const user of users) {
+        const dx = user.x - me.x;
+        const dy = user.y - me.y;
+
+        const screenX = canvas.width / 2 + dx;
+        const screenY = canvas.height / 2 + dy;
+
+        ctx.fillStyle = user.color;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 20, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    document.addEventListener("keydown", function(e) {
+      let dx = 0, dy = 0;
+      if (e.key === "ArrowUp") dy = -10;
+      else if (e.key === "ArrowDown") dy = 10;
+      else if (e.key === "ArrowLeft") dx = -10;
+      else if (e.key === "ArrowRight") dx = 10;
+      else return;
+
+      socket.send(JSON.stringify({
+        type: "move",
+        dx: dx,
+        dy: dy
+      }));
+    });
+
+    socket.onopen = () => {
+      // 연결되면 임시로 내 ID 설정 (서버에서 지정해도 됨)
+      myId = socket.url;  // 대체로 고유하므로 활용 가능
+    };
+  </script>
+</body>
+</html>

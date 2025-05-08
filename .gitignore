@@ -1,0 +1,57 @@
+# Python 관련
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# 데이터베이스 파일
+*.db
+*.sqlite3
+
+# 패키지 관련
+*.egg-info/
+*.egg
+*.whl
+
+# 로그 파일
+*.log
+
+# 테스트 및 커버리지
+*.coverage
+*.cover
+.hypothesis/
+.tox/
+.mypy_cache/
+.pytest_cache/
+.coverage.*
+.coveragerc
+
+# pylint 관련
+.pylint.d
+.pylint_report
+.pylint_json
+.pylint_json_report
+.pylint_json_report.json
+
+# Django 관련
+*.pot
+*.pyc
+*.mo
+*.env
+*.local
+*.DS_Store
+db.sqlite3
+media/
+staticfiles/
+static/
+.env.*
+
+# IDE/편집기 관련
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+*.tmp
