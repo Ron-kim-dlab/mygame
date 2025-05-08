@@ -36,6 +36,9 @@ class GameConsumer(AsyncWebsocketConsumer):
             dx = data.get("dx", 0)
             dy = data.get("dy", 0)
             player_manager.move_player(self.player_id, dx, dy)
+            
+            # 임시 로그
+            print(f"[MOVE] Player {self.player_id[:8]} moved by ({dx}, {dy})")
 
             # 전체 상태 브로드캐스트
             await self.channel_layer.group_send(
